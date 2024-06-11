@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
 	import { createEventDispatcher } from 'svelte';
-	import { onMount, getContext } from 'svelte';
+	import { getContext } from 'svelte';
 	import { addUser } from '$lib/apis/auths';
+	import { getGroups } from '$lib/apis/groups';
 
 	import Modal from '../common/Modal.svelte';
 	import { WEBUI_BASE_URL } from '$lib/constants';
+	import { user } from '$lib/stores';
 
 	const i18n = getContext('i18n');
 	const dispatch = createEventDispatcher();
@@ -20,17 +22,30 @@
 		name: '',
 		email: '',
 		password: '',
-		role: 'user'
+		role: 'user',
+		group_id: ''
 	};
+
+	let groups = [];
 
 	$: if (show) {
 		_user = {
 			name: '',
 			email: '',
 			password: '',
-			role: 'user'
+			role: 'user',
+			group_id: ''
 		};
+		loadGroups();
 	}
+
+	const loadGroups = async () => {
+		if ($user?.role === 'admin') {
+			groups = await getGroups(localStorage.token).catch((error) => {
+				toast.error(error);
+			});
+		}
+	};
 
 	const submitHandler = async () => {
 		const stopLoading = () => {
@@ -46,7 +61,8 @@
 				_user.name,
 				_user.email,
 				_user.password,
-				_user.role
+				_user.role,
+				_user.group_id
 			).catch((error) => {
 				toast.error(error);
 			});
@@ -75,7 +91,7 @@
 						if (idx > 0) {
 							if (
 								columns.length === 4 &&
-								['admin', 'user', 'pending'].includes(columns[3].toLowerCase())
+								['groupadmin', 'admin', 'user', 'pending'].includes(columns[3].toLowerCase())
 							) {
 								const res = await addUser(
 									localStorage.token,
@@ -178,7 +194,10 @@
 									>
 										<option value="pending"> pending </option>
 										<option value="user"> user </option>
-										<option value="admin"> admin </option>
+										{#if $user?.role === 'admin'}
+											<option value="admin"> admin </option>
+										{/if}
+										<option value="groupadmin"> groupadmin </option>
 									</select>
 								</div>
 							</div>
@@ -228,6 +247,27 @@
 									/>
 								</div>
 							</div>
+
+							{#if $user?.role === 'admin'}
+								<div class="flex flex-col w-full mt-2">
+									<div class=" mb-1 text-xs text-gray-500">{$i18n.t('Group')}</div>
+
+									<div class="flex-1">
+										<select
+											class="w-full capitalize rounded-lg py-2 px-4 text-sm dark:text-gray-300 dark:bg-gray-850 disabled:text-gray-500 dark:disabled:text-gray-500 outline-none"
+											bind:value={_user.group_id}
+											placeholder={$i18n.t('Select Group')}
+											required
+										>
+											<option value="" disabled selected>{$i18n.t('Select Group')}</option>
+											{#each groups as group}
+												<option value={group.id}>{group.name}</option>
+											{/each}
+										</select>
+									</div>
+								</div>
+							{/if}
+
 						{:else if tab === 'import'}
 							<div>
 								<div class="mb-3 w-full">
@@ -256,8 +296,8 @@
 
 								<div class=" text-xs text-gray-500">
 									ⓘ {$i18n.t(
-										'Ensure your CSV file includes 4 columns in this order: Name, Email, Password, Role.'
-									)}
+									'Ensure your CSV file includes 4 columns in this order: Name, Email, Password, Role.'
+								)}
 									<a
 										class="underline dark:text-gray-200"
 										href="{WEBUI_BASE_URL}/static/user-import.csv"
@@ -286,23 +326,23 @@
 										viewBox="0 0 24 24"
 										fill="currentColor"
 										xmlns="http://www.w3.org/2000/svg"
-										><style>
-											.spinner_ajPY {
-												transform-origin: center;
-												animation: spinner_AtaB 0.75s infinite linear;
-											}
-											@keyframes spinner_AtaB {
-												100% {
-													transform: rotate(360deg);
-												}
-											}
-										</style><path
-											d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z"
-											opacity=".25"
-										/><path
-											d="M10.14,1.16a11,11,0,0,0-9,8.92A1.59,1.59,0,0,0,2.46,12,1.52,1.52,0,0,0,4.11,10.7a8,8,0,0,1,6.66-6.61A1.42,1.42,0,0,0,12,2.69h0A1.57,1.57,0,0,0,10.14,1.16Z"
-											class="spinner_ajPY"
-										/></svg
+									><style>
+                      .spinner_ajPY {
+                          transform-origin: center;
+                          animation: spinner_AtaB 0.75s infinite linear;
+                      }
+                      @keyframes spinner_AtaB {
+                          100% {
+                              transform: rotate(360deg);
+                          }
+                      }
+									</style><path
+										d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z"
+										opacity=".25"
+									/><path
+										d="M10.14,1.16a11,11,0,0,0-9,8.92A1.59,1.59,0,0,0,2.46,12,1.52,1.52,0,0,0,4.11,10.7a8,8,0,0,1,6.66-6.61A1.42,1.42,0,0,0,12,2.69h0A1.57,1.57,0,0,0,10.14,1.16Z"
+										class="spinner_ajPY"
+									/></svg
 									>
 								</div>
 							{/if}
@@ -315,23 +355,23 @@
 </Modal>
 
 <style>
-	input::-webkit-outer-spin-button,
-	input::-webkit-inner-spin-button {
-		/* display: none; <- Crashes Chrome on hover */
-		-webkit-appearance: none;
-		margin: 0; /* <-- Apparently some margin are still there even though it's hidden */
-	}
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+        /* display: none; <- Crashes Chrome on hover */
+        -webkit-appearance: none;
+        margin: 0; /* <-- Apparently some margin are still there even though it's hidden */
+    }
 
-	.tabs::-webkit-scrollbar {
-		display: none; /* for Chrome, Safari and Opera */
-	}
+    .tabs::-webkit-scrollbar {
+        display: none; /* for Chrome, Safari and Opera */
+    }
 
-	.tabs {
-		-ms-overflow-style: none; /* IE and Edge */
-		scrollbar-width: none; /* Firefox */
-	}
+    .tabs {
+        -ms-overflow-style: none; /* IE and Edge */
+        scrollbar-width: none; /* Firefox */
+    }
 
-	input[type='number'] {
-		-moz-appearance: textfield; /* Firefox */
-	}
+    input[type='number'] {
+        -moz-appearance: textfield; /* Firefox */
+    }
 </style>

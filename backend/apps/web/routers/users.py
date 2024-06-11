@@ -13,7 +13,7 @@ from apps.web.models.users import UserModel, UserUpdateForm, UserRoleUpdateForm,
 from apps.web.models.auths import Auths
 from apps.web.models.chats import Chats
 
-from utils.utils import get_verified_user, get_password_hash, get_admin_user
+from utils.utils import get_verified_user, get_password_hash, get_admin_user, get_groupadmin_user, get_admin_or_groupadmin_user
 from constants import ERROR_MESSAGES
 
 from config import SRC_LOG_LEVELS
@@ -29,7 +29,10 @@ router = APIRouter()
 
 
 @router.get("/", response_model=List[UserModel])
-async def get_users(skip: int = 0, limit: int = 50, user=Depends(get_admin_user)):
+async def get_users(skip: int = 0, limit: int = 50, user=Depends(get_admin_or_groupadmin_user)):
+    if user.role == "groupadmin":
+        return Users.get_users_by_group(user.group_id, skip, limit)
+
     return Users.get_users(skip, limit)
 
 
@@ -57,7 +60,7 @@ async def update_user_permissions(
 
 
 @router.post("/update/role", response_model=Optional[UserModel])
-async def update_user_role(form_data: UserRoleUpdateForm, user=Depends(get_admin_user)):
+async def update_user_role(form_data: UserRoleUpdateForm, user=Depends(get_admin_or_groupadmin_user)):
 
     if user.id != form_data.id and form_data.id != Users.get_first_user().id:
         return Users.update_user_role_by_id(form_data.id, form_data.role)
@@ -109,9 +112,7 @@ async def get_user_by_id(user_id: str, user=Depends(get_verified_user)):
 
 
 @router.post("/{user_id}/update", response_model=Optional[UserModel])
-async def update_user_by_id(
-    user_id: str, form_data: UserUpdateForm, session_user=Depends(get_admin_user)
-):
+async def update_user_by_id(user_id: str, form_data: UserUpdateForm, session_user=Depends(get_admin_or_groupadmin_user)):
     user = Users.get_user_by_id(user_id)
 
     if user:
@@ -135,6 +136,7 @@ async def update_user_by_id(
                 "name": form_data.name,
                 "email": form_data.email.lower(),
                 "profile_image_url": form_data.profile_image_url,
+                "group_id": form_data.group_id
             },
         )
 

@@ -4,9 +4,13 @@ from playhouse.shortcuts import model_to_dict
 from typing import List, Union, Optional
 import time
 from utils.misc import get_gravatar_url
+import logging
 
 from apps.web.internal.db import DB
 from apps.web.models.chats import Chats
+from apps.web.models.groups import Group, GroupModel, Groups
+
+log = logging.getLogger(__name__)
 
 ####################
 # User DB Schema
@@ -18,6 +22,7 @@ class User(Model):
     name = CharField()
     email = CharField()
     role = CharField()
+    group = ForeignKeyField(Group, backref='user', null=True)
     profile_image_url = TextField()
 
     last_active_at = BigIntegerField()
@@ -35,6 +40,8 @@ class UserModel(BaseModel):
     name: str
     email: str
     role: str = "pending"
+    group_id: Optional[int] = None
+    group_name: Optional[str] = None
     profile_image_url: str
 
     last_active_at: int  # timestamp in epoch
@@ -59,12 +66,12 @@ class UserUpdateForm(BaseModel):
     email: str
     profile_image_url: str
     password: Optional[str] = None
-
+    group_id: int
 
 class UsersTable:
     def __init__(self, db):
         self.db = db
-        self.db.create_tables([User])
+        self.db.create_tables([User, Group])
 
     def insert_new_user(
         self,
@@ -73,13 +80,16 @@ class UsersTable:
         email: str,
         profile_image_url: str = "/user.png",
         role: str = "pending",
+        group_id: int = 0
     ) -> Optional[UserModel]:
+
         user = UserModel(
             **{
                 "id": id,
                 "name": name,
                 "email": email,
                 "role": role,
+                "group_id": group_id,
                 "profile_image_url": profile_image_url,
                 "last_active_at": int(time.time()),
                 "created_at": int(time.time()),
@@ -92,42 +102,128 @@ class UsersTable:
         else:
             return None
 
+    # def get_user_by_id(self, id: str) -> Optional[UserModel]:
+    #     try:
+    #         user = User.get(User.id == id)
+    #         if user:
+    #             log.info(f"User found in DB: {model_to_dict(user, backrefs=True, recurse=False)}")
+    #             group_name = None
+    #             if user.group_id:
+    #                 try:
+    #                     group = Group.get(Group.id == user.group_id)
+    #                     group_name = group.name
+    #                 except Group.DoesNotExist:
+    #                     pass
+    #             return UserModel(
+    #                 id=user.id,
+    #                 name=user.name,
+    #                 email=user.email,
+    #                 role=user.role,
+    #                 group_id=user.group_id,
+    #                 group_name=group_name,
+    #                 profile_image_url=user.profile_image_url,
+    #                 last_active_at=user.last_active_at,
+    #                 updated_at=user.updated_at,
+    #                 created_at=user.created_at,
+    #                 api_key=user.api_key
+    #             )
+    #         else:
+    #             log.info("User not found in DB")
+    #             return None
+    #     except Exception as e:
+    #         log.error(f"Error in get_user_by_id: {e}")
+    #         return None
+
     def get_user_by_id(self, id: str) -> Optional[UserModel]:
         try:
             user = User.get(User.id == id)
-            return UserModel(**model_to_dict(user))
-        except:
+            user_dict = model_to_dict(user, backrefs=True, recurse=False)
+            user_dict['group_id'] = user.group_id
+            try:
+                group = Group.get(Group.id == user.group_id)
+                user_dict['group_name'] = group.name
+            except Group.DoesNotExist:
+                user_dict['group_name'] = None
+            return UserModel(**user_dict)
+        except Exception as e:
+            log.error(f"Error in get_user_by_id: {e}")
             return None
 
     def get_user_by_api_key(self, api_key: str) -> Optional[UserModel]:
         try:
             user = User.get(User.api_key == api_key)
-            return UserModel(**model_to_dict(user))
-        except:
+            user_dict = model_to_dict(user, backrefs=True, recurse=False)
+            try:
+                group = Group.get(Group.id == user.group_id)
+                user_dict['group_name'] = group.name
+            except Group.DoesNotExist:
+                user_dict['group_name'] = None
+            return UserModel(**user_dict)
+        except Exception as e:
+            log.error(f"Error in get_user_by_api_key: {e}")
             return None
 
     def get_user_by_email(self, email: str) -> Optional[UserModel]:
         try:
             user = User.get(User.email == email)
-            return UserModel(**model_to_dict(user))
-        except:
+            user_dict = model_to_dict(user, backrefs=True, recurse=False)
+            if user.group_id:
+                try:
+                    group = Group.get(Group.id == user.group_id)
+                    user_dict['group_name'] = group.name
+                except Group.DoesNotExist:
+                    user_dict['group_name'] = None
+                    user_dict['group_id'] = None
+            return UserModel(**user_dict)
+        except Exception as e:
             return None
 
     def get_users(self, skip: int = 0, limit: int = 50) -> List[UserModel]:
-        return [
-            UserModel(**model_to_dict(user))
-            for user in User.select()
-            # .limit(limit).offset(skip)
-        ]
+        users = []
+        for user in User.select().limit(limit).offset(skip):
+            user_dict = model_to_dict(user, backrefs=True, recurse=False)
+            user_dict['group_id'] = user.group_id  # додати явне встановлення group_id
+            try:
+                group = Group.get(Group.id == user.group_id)
+                user_dict['group_name'] = group.name
+            except Group.DoesNotExist:
+                user_dict['group_name'] = None
+            users.append(UserModel(**user_dict))
+        return users
+
+    def get_users_by_group(self, group_id: int, skip: int = 0, limit: int = 50) -> List[UserModel]:
+        users = []
+        for user in User.select().where(User.group_id == group_id).limit(limit).offset(skip):
+            user_dict = model_to_dict(user, backrefs=True, recurse=False)
+            user_dict['group_id'] = user.group_id  # додати явне встановлення group_id
+            try:
+                group = Group.get(Group.id == user.group_id)
+                user_dict['group_name'] = group.name
+            except Group.DoesNotExist:
+                user_dict['group_name'] = None
+            users.append(UserModel(**user_dict))
+        return users
 
     def get_num_users(self) -> Optional[int]:
         return User.select().count()
 
-    def get_first_user(self) -> UserModel:
+    def get_first_user(self) -> Optional[UserModel]:
         try:
             user = User.select().order_by(User.created_at).first()
-            return UserModel(**model_to_dict(user))
-        except:
+            if not user:
+                return None
+
+            user_dict = model_to_dict(user, backrefs=True, recurse=False)
+            user_dict['group_id'] = user.group_id  # додати явне встановлення group_id
+            try:
+                group = Group.get(Group.id == user.group_id)
+                user_dict['group_name'] = group.name
+            except Group.DoesNotExist:
+                user_dict['group_name'] = None
+
+            return UserModel(**user_dict)
+        except Exception as e:
+            log.error(f"Error in get_first_user: {e}")
             return None
 
     def update_user_role_by_id(self, id: str, role: str) -> Optional[UserModel]:
@@ -136,9 +232,19 @@ class UsersTable:
             query.execute()
 
             user = User.get(User.id == id)
-            return UserModel(**model_to_dict(user))
-        except:
+            user_dict = model_to_dict(user, backrefs=True, recurse=False)
+            user_dict['group_id'] = user.group_id  # додати явне встановлення group_id
+            try:
+                group = Group.get(Group.id == user.group_id)
+                user_dict['group_name'] = group.name
+            except Group.DoesNotExist:
+                user_dict['group_name'] = None
+
+            return UserModel(**user_dict)
+        except Exception as e:
+            log.error(f"Error in update_user_role_by_id: {e}")
             return None
+
 
     def update_user_profile_image_url_by_id(
         self, id: str, profile_image_url: str

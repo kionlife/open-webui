@@ -6,6 +6,7 @@ import logging
 from peewee import *
 
 from apps.web.models.users import UserModel, Users
+from playhouse.shortcuts import model_to_dict
 from utils.utils import verify_password
 
 from apps.web.internal.db import DB
@@ -34,7 +35,8 @@ class AuthModel(BaseModel):
     id: str
     email: str
     password: str
-    active: bool = True
+    active: bool = True,
+    group_id: int = 0
 
 
 ####################
@@ -105,17 +107,19 @@ class AuthsTable:
         name: str,
         profile_image_url: str = "/user.png",
         role: str = "pending",
+        group_id: int = 0,
     ) -> Optional[UserModel]:
         log.info("insert_new_auth")
+        log.info("group_id: " + str(group_id))
 
         id = str(uuid.uuid4())
 
         auth = AuthModel(
-            **{"id": id, "email": email, "password": password, "active": True}
+            **{"id": id, "email": email, "password": password, "active": True, "group_id": group_id}
         )
         result = Auth.create(**auth.model_dump())
 
-        user = Users.insert_new_user(id, name, email, profile_image_url, role)
+        user = Users.insert_new_user(id, name, email, profile_image_url, role, group_id)
 
         if result and user:
             return user
@@ -129,13 +133,36 @@ class AuthsTable:
             if auth:
                 if verify_password(password, auth.password):
                     user = Users.get_user_by_id(auth.id)
-                    return user
+                    if user:
+                        log.info(f"User found: {user}")
+                        user_data = {
+                            'id': user.id,
+                            'name': user.name,
+                            'email': user.email,
+                            'role': user.role,
+                            'group_id': user.group_id,
+                            'group_name': user.group_name,
+                            'profile_image_url': user.profile_image_url,
+                            'last_active_at': user.last_active_at,
+                            'updated_at': user.updated_at,
+                            'created_at': user.created_at,
+                            'api_key': user.api_key
+                        }
+                        return UserModel(**user_data)
+                    else:
+                        log.info("User not found in Users.get_user_by_id")
+                        return None
                 else:
+                    log.info("Password verification failed")
                     return None
             else:
+                log.info("No active user found")
                 return None
-        except:
+        except Exception as e:
+            log.error(f"Error during authentication: {e}")
             return None
+
+
 
     def authenticate_user_by_api_key(self, api_key: str) -> Optional[UserModel]:
         log.info(f"authenticate_user_by_api_key: {api_key}")

@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from apps.web.routers import (
     auths,
     users,
+    groups,
     chats,
     documents,
     modelfiles,
@@ -53,6 +54,7 @@ app.add_middleware(
 
 app.include_router(auths.router, prefix="/auths", tags=["auths"])
 app.include_router(users.router, prefix="/users", tags=["users"])
+app.include_router(groups.router, prefix="/groups")
 app.include_router(chats.router, prefix="/chats", tags=["chats"])
 
 app.include_router(documents.router, prefix="/documents", tags=["documents"])

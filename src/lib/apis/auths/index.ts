@@ -100,7 +100,8 @@ export const addUser = async (
 	name: string,
 	email: string,
 	password: string,
-	role: string = 'pending'
+	role: string = 'pending',
+	group_id: number,
 ) => {
 	let error = null;
 
@@ -114,7 +115,8 @@ export const addUser = async (
 			name: name,
 			email: email,
 			password: password,
-			role: role
+			role: role,
+			group_id: group_id
 		})
 	})
 		.then(async (res) => {

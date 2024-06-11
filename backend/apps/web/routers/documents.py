@@ -14,7 +14,7 @@ from apps.web.models.documents import (
     DocumentResponse,
 )
 
-from utils.utils import get_current_user, get_admin_user
+from utils.utils import get_current_user, get_admin_user, get_admin_or_groupadmin_user
 from constants import ERROR_MESSAGES
 
 router = APIRouter()
@@ -26,15 +26,27 @@ router = APIRouter()
 
 @router.get("/", response_model=List[DocumentResponse])
 async def get_documents(user=Depends(get_current_user)):
-    docs = [
-        DocumentResponse(
-            **{
-                **doc.model_dump(),
-                "content": json.loads(doc.content if doc.content else "{}"),
-            }
-        )
-        for doc in Documents.get_docs()
-    ]
+    if user.role == 'admin':
+        docs = [
+            DocumentResponse(
+                **{
+                    **doc.model_dump(),
+                    "content": json.loads(doc.content if doc.content else "{}"),
+                }
+            )
+            for doc in Documents.get_docs()
+        ]
+    else:
+        docs = [
+            DocumentResponse(
+                **{
+                    **doc.model_dump(),
+                    "content": json.loads(doc.content if doc.content else "{}"),
+                }
+            )
+            for doc in Documents.get_docs_by_group(user.group_id)
+        ]
+
     return docs
 
 
@@ -44,7 +56,7 @@ async def get_documents(user=Depends(get_current_user)):
 
 
 @router.post("/create", response_model=Optional[DocumentResponse])
-async def create_new_doc(form_data: DocumentForm, user=Depends(get_admin_user)):
+async def create_new_doc(form_data: DocumentForm, user=Depends(get_admin_or_groupadmin_user)):
     doc = Documents.get_doc_by_name(form_data.name)
     if doc == None:
         doc = Documents.insert_new_doc(user.id, form_data)

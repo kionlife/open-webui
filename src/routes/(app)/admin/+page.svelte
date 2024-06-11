@@ -17,6 +17,7 @@
 
 	import EditUserModal from '$lib/components/admin/EditUserModal.svelte';
 	import SettingsModal from '$lib/components/admin/SettingsModal.svelte';
+	import GroupsModal from '$lib/components/admin/GroupsModal.svelte';
 	import Pagination from '$lib/components/common/Pagination.svelte';
 	import ChatBubbles from '$lib/components/icons/ChatBubbles.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
@@ -36,6 +37,7 @@
 
 	let showSettingsModal = false;
 	let showAddUserModal = false;
+	let showGroupsModal = false;
 
 	let showUserChatsModal = false;
 	let showEditUserModal = false;
@@ -73,7 +75,7 @@
 	};
 
 	onMount(async () => {
-		if ($user?.role !== 'admin') {
+		if ($user?.role !== 'admin' && $user?.role !== 'groupadmin') {
 			await goto('/');
 		} else {
 			users = await getUsers(localStorage.token);
@@ -105,6 +107,9 @@
 />
 <UserChatsModal bind:show={showUserChatsModal} user={selectedUser} />
 <SettingsModal bind:show={showSettingsModal} />
+{#if $user?.role === 'admin'}
+	<GroupsModal bind:show={showGroupsModal} />
+{/if}
 
 <div class=" flex flex-col w-full min-h-screen">
 	{#if loaded}
@@ -181,6 +186,7 @@
 							</button>
 						</Tooltip>
 
+						{#if $user?.role === 'admin'}
 						<Tooltip content={$i18n.t('Admin Settings')}>
 							<button
 								class=" px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-600 dark:border-0 hover:bg-gray-100 dark:bg-gray-850 dark:hover:bg-gray-800 transition font-medium text-sm flex items-center space-x-1"
@@ -202,6 +208,17 @@
 								</svg>
 							</button>
 						</Tooltip>
+						<Tooltip content={$i18n.t('Groups Management')}>
+							<button
+								class=" px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-600 dark:border-0 hover:bg-gray-100 dark:bg-gray-850 dark:hover:bg-gray-800 transition font-medium text-sm flex items-center space-x-1"
+								on:click={() => {
+									showGroupsModal = !showGroupsModal;
+								}}
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+							</button>
+						</Tooltip>
+							{/if}
 					</div>
 				</div>
 			</div>
@@ -213,6 +230,7 @@
 					>
 						<tr>
 							<th scope="col" class="px-3 py-2"> {$i18n.t('Role')} </th>
+							<th scope="col" class="px-3 py-2"> {$i18n.t('Group')} </th>
 							<th scope="col" class="px-3 py-2"> {$i18n.t('Name')} </th>
 							<th scope="col" class="px-3 py-2"> {$i18n.t('Email')} </th>
 							<th scope="col" class="px-3 py-2"> {$i18n.t('Last Active')} </th>
@@ -238,6 +256,7 @@
 								<td class="px-3 py-2 min-w-[7rem] w-28">
 									<button
 										class=" flex items-center gap-2 text-xs px-3 py-0.5 rounded-lg {user.role ===
+											'groupadmin' && 'text-sky-600 dark:text-sky-200 bg-sky-600'} {user.role ===
 											'admin' && 'text-sky-600 dark:text-sky-200 bg-sky-200/30'} {user.role ===
 											'user' && 'text-green-600 dark:text-green-200 bg-green-200/30'} {user.role ===
 											'pending' && 'text-gray-600 dark:text-gray-200 bg-gray-200/30'}"
@@ -246,19 +265,29 @@
 												updateRoleHandler(user.id, 'admin');
 											} else if (user.role === 'pending') {
 												updateRoleHandler(user.id, 'user');
+											} else if (user.role === 'admin') {
+												updateRoleHandler(user.id, 'groupadmin');
 											} else {
 												updateRoleHandler(user.id, 'pending');
 											}
 										}}
 									>
 										<div
-											class="w-1 h-1 rounded-full {user.role === 'admin' &&
+											class="w-1 h-1 rounded-full {user.role === 'groupadmin' &&
+												'bg-sky-600 dark:bg-sky-300'} {user.role === 'admin' &&
 												'bg-sky-600 dark:bg-sky-300'} {user.role === 'user' &&
 												'bg-green-600 dark:bg-green-300'} {user.role === 'pending' &&
 												'bg-gray-600 dark:bg-gray-300'}"
 										/>
-										{$i18n.t(user.role)}</button
-									>
+										{$i18n.t(user.role)}
+									</button>
+								</td>
+								<td class="px-3 py-2 min-w-[7rem] w-28">
+									{#if (user.group_name)}
+										{user.group_name}
+									{:else}
+										<i>no group</i>
+									{/if}
 								</td>
 								<td class="px-3 py-2 font-medium text-gray-900 dark:text-white w-max">
 									<div class="flex flex-row w-max">

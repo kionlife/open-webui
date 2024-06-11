@@ -68,7 +68,7 @@
 	onMount(async () => {
 		if ($user === undefined) {
 			await goto('/auth');
-		} else if (['user', 'admin'].includes($user.role)) {
+		} else if (['user', 'admin', 'groupadmin'].includes($user.role)) {
 			try {
 				// Check if IndexedDB exists
 				DB = await openDB('Chats', 1);
@@ -200,7 +200,7 @@
 		class=" text-gray-700 dark:text-gray-100 bg-white dark:bg-gray-900 min-h-screen overflow-auto flex flex-row"
 	>
 		{#if loaded}
-			{#if !['user', 'admin'].includes($user.role)}
+			{#if !['user', 'admin', 'groupadmin'].includes($user.role)}
 				<div class="fixed w-full h-full flex z-[999]">
 					<div
 						class="absolute w-full h-full backdrop-blur-lg bg-white/10 dark:bg-gray-900/50 flex justify-center"

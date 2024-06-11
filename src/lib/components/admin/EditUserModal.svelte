@@ -3,9 +3,11 @@
 	import dayjs from 'dayjs';
 	import { createEventDispatcher } from 'svelte';
 	import { onMount, getContext } from 'svelte';
-
 	import { updateUserById } from '$lib/apis/users';
+	import { getGroups } from '$lib/apis/groups';
+
 	import Modal from '../common/Modal.svelte';
+	import { user } from '$lib/stores';
 
 	const i18n = getContext('i18n');
 	const dispatch = createEventDispatcher();
@@ -18,7 +20,25 @@
 		profile_image_url: '',
 		name: '',
 		email: '',
-		password: ''
+		password: '',
+		group_id: ''
+	};
+
+	let groups = [];
+
+	onMount(() => {
+		if (selectedUser) {
+			_user = { ...selectedUser, password: '' };
+			if ($user?.role === 'admin') {
+				loadGroups();
+			}
+		}
+	});
+
+	const loadGroups = async () => {
+		groups = await getGroups(localStorage.token).catch((error) => {
+			toast.error(error);
+		});
 	};
 
 	const submitHandler = async () => {
@@ -31,13 +51,6 @@
 			show = false;
 		}
 	};
-
-	onMount(() => {
-		if (selectedUser) {
-			_user = selectedUser;
-			_user.password = '';
-		}
-	});
 </script>
 
 <Modal size="sm" bind:show>
@@ -135,6 +148,27 @@
 								/>
 							</div>
 						</div>
+
+						{#if $user?.role === 'admin'}
+							<div class="flex flex-col w-full">
+								<div class=" mb-1 text-xs text-gray-500">{$i18n.t('Group')}</div>
+
+								<div class="flex-1">
+									<select
+										class="w-full capitalize rounded-lg py-2 px-4 text-sm dark:text-gray-300 dark:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-500 outline-none"
+										bind:value={_user.group_id}
+										placeholder={$i18n.t('Select Group')}
+										required
+									>
+										<option value="" disabled selected>{$i18n.t('Select Group')}</option>
+										{#each groups as group}
+											<option value={group.id}>{group.name}</option>
+										{/each}
+									</select>
+								</div>
+							</div>
+						{/if}
+
 					</div>
 
 					<div class="flex justify-end pt-3 text-sm font-medium">
@@ -152,23 +186,23 @@
 </Modal>
 
 <style>
-	input::-webkit-outer-spin-button,
-	input::-webkit-inner-spin-button {
-		/* display: none; <- Crashes Chrome on hover */
-		-webkit-appearance: none;
-		margin: 0; /* <-- Apparently some margin are still there even though it's hidden */
-	}
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+        /* display: none; <- Crashes Chrome on hover */
+        -webkit-appearance: none;
+        margin: 0; /* <-- Apparently some margin are still there even though it's hidden */
+    }
 
-	.tabs::-webkit-scrollbar {
-		display: none; /* for Chrome, Safari and Opera */
-	}
+    .tabs::-webkit-scrollbar {
+        display: none; /* for Chrome, Safari and Opera */
+    }
 
-	.tabs {
-		-ms-overflow-style: none; /* IE and Edge */
-		scrollbar-width: none; /* Firefox */
-	}
+    .tabs {
+        -ms-overflow-style: none; /* IE and Edge */
+        scrollbar-width: none; /* Firefox */
+    }
 
-	input[type='number'] {
-		-moz-appearance: textfield; /* Firefox */
-	}
+    input[type='number'] {
+        -moz-appearance: textfield; /* Firefox */
+    }
 </style>

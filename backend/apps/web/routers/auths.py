@@ -27,6 +27,8 @@ from utils.utils import (
     get_password_hash,
     get_current_user,
     get_admin_user,
+    get_groupadmin_user,
+    get_admin_or_groupadmin_user,
     create_token,
     create_api_key,
 )
@@ -36,6 +38,7 @@ from constants import ERROR_MESSAGES, WEBHOOK_MESSAGES
 from config import WEBUI_AUTH, WEBUI_AUTH_TRUSTED_EMAIL_HEADER
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
 ############################
 # GetSessionUser
@@ -151,6 +154,8 @@ async def signin(request: Request, form_data: SigninForm):
             "name": user.name,
             "role": user.role,
             "profile_image_url": user.profile_image_url,
+            "group_id": user.group_id,  # додане поле group_id
+            "group_name": user.group_name  # додане поле group_name
         }
     else:
         raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
@@ -230,7 +235,7 @@ async def signup(request: Request, form_data: SignupForm):
 
 
 @router.post("/add", response_model=SigninResponse)
-async def add_user(form_data: AddUserForm, user=Depends(get_admin_user)):
+async def add_user(form_data: AddUserForm, user=Depends(get_admin_or_groupadmin_user)):
 
     if not validate_email_format(form_data.email.lower()):
         raise HTTPException(
@@ -242,6 +247,9 @@ async def add_user(form_data: AddUserForm, user=Depends(get_admin_user)):
 
     try:
 
+        log.info("user: " + str(user))
+
+        creator_group_id = user.group_id
         print(form_data)
         hashed = get_password_hash(form_data.password)
         user = Auths.insert_new_auth(
@@ -250,6 +258,7 @@ async def add_user(form_data: AddUserForm, user=Depends(get_admin_user)):
             form_data.name,
             form_data.profile_image_url,
             form_data.role,
+            creator_group_id
         )
 
         if user:
@@ -262,6 +271,7 @@ async def add_user(form_data: AddUserForm, user=Depends(get_admin_user)):
                 "name": user.name,
                 "role": user.role,
                 "profile_image_url": user.profile_image_url,
+                "group_id": user.group_id
             }
         else:
             raise HTTPException(500, detail=ERROR_MESSAGES.CREATE_USER_ERROR)
@@ -275,7 +285,7 @@ async def add_user(form_data: AddUserForm, user=Depends(get_admin_user)):
 
 
 @router.get("/signup/enabled", response_model=bool)
-async def get_sign_up_status(request: Request, user=Depends(get_admin_user)):
+async def get_sign_up_status(request: Request, user=Depends(get_admin_or_groupadmin_user)):
     return request.app.state.config.ENABLE_SIGNUP
 
 

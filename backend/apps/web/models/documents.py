@@ -9,6 +9,8 @@ from utils.utils import decode_token
 from utils.misc import get_gravatar_url
 
 from apps.web.internal.db import DB
+from apps.web.models.users import User, UserModel
+
 
 import json
 
@@ -109,6 +111,14 @@ class DocumentsTable:
             for doc in Document.select()
             # .limit(limit).offset(skip)
         ]
+
+    def get_docs_by_group(self, group_id: int) -> List[DocumentModel]:
+        query = (Document
+                 .select(Document, User)
+                 .join(User, on=(Document.user_id == User.id))
+                 .where(User.group_id == group_id))
+
+        return [DocumentModel(**model_to_dict(doc, recurse=False)) for doc in query]
 
     def update_doc_by_name(
         self, name: str, form_data: DocumentUpdateForm

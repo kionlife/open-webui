@@ -16,7 +16,6 @@ import config
 
 logging.getLogger("passlib").setLevel(logging.ERROR)
 
-
 SESSION_SECRET = config.WEBUI_SECRET_KEY
 ALGORITHM = "HS256"
 
@@ -58,7 +57,7 @@ def decode_token(token: str) -> Optional[dict]:
 
 
 def extract_token_from_auth_header(auth_header: str):
-    return auth_header[len("Bearer ") :]
+    return auth_header[len("Bearer "):]
 
 
 def create_api_key():
@@ -75,7 +74,7 @@ def get_http_authorization_cred(auth_header: str):
 
 
 def get_current_user(
-    auth_token: HTTPAuthorizationCredentials = Depends(bearer_security),
+        auth_token: HTTPAuthorizationCredentials = Depends(bearer_security),
 ):
     # auth by api key
     if auth_token.credentials.startswith("sk-"):
@@ -114,7 +113,7 @@ def get_current_user_by_api_key(api_key: str):
 
 
 def get_verified_user(user=Depends(get_current_user)):
-    if user.role not in {"user", "admin"}:
+    if user.role not in {"user", "admin", "groupadmin"}:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
@@ -124,6 +123,24 @@ def get_verified_user(user=Depends(get_current_user)):
 
 def get_admin_user(user=Depends(get_current_user)):
     if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+        )
+    return user
+
+
+def get_groupadmin_user(user=Depends(get_current_user)):
+    if user.role != "groupadmin":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+        )
+    return user
+
+
+def get_admin_or_groupadmin_user(user=Depends(get_current_user)):
+    if user.role != "groupadmin" and user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
